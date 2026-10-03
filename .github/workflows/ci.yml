@@ -7,6 +7,10 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+# 호출되는 공용 워크플로가 요구하는 권한을 여기서 준다(없으면 startup_failure). 패키지 쓰기는 GHCR·GitHub Packages push용
+permissions:
+  contents: read
+  packages: write
 jobs:
   ci:
     uses: data2flow/.github/.github/workflows/python-service.yml@v1
