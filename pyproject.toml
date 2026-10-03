@@ -1,0 +1,31 @@
+[project]
+name = "data2flow-analytics"
+version = "0.1.0"
+description = "data2flow 분석 서비스: 분석 템플릿 카탈로그, 충분성 확인, 분석 실행·학습, 실시간 추론 (ANA, ADR-010·011)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.120",
+    "uvicorn[standard]>=0.38",
+    "prometheus-client>=0.23",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4",
+    "pytest-cov>=7.0",
+    "httpx>=0.28",
+]
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/data2flow_analytics"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=data2flow_analytics --cov-report=term-missing --cov-fail-under=80"
+
+[tool.coverage.run]
+omit = ["src/data2flow_analytics/__main__.py"]

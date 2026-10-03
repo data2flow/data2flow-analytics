@@ -1,0 +1,15 @@
+# CI 단계는 조직 공용 재사용 워크플로에 한 번만 정의한다
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ci:
+    uses: data2flow/.github/.github/workflows/python-service.yml@v1
+    with:
+      app-name: data2flow-analytics
+    secrets: inherit
