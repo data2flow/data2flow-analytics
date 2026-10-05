@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://data2flow.java21.net/schemas/analytics/chartspec.v1.json",
+  "title": "ChartSpec v1 (ANA-api §4.2, 공통 렌더러 계약)",
+  "type": "object",
+  "required": ["id", "type", "title", "series", "gaps"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "type": {"enum": ["line", "band", "scatter", "bar", "heatmap", "calendar", "gauge", "table", "timeline"]},
+    "title": {"type": "string"},
+    "xAxis": {"$ref": "#/$defs/axis"},
+    "yAxis": {"$ref": "#/$defs/axis"},
+    "series": {"type": "array", "items": {
+      "type": "object", "required": ["key", "label", "data"],
+      "properties": {
+        "key": {"type": "string"}, "label": {"type": "string"},
+        "data": {"type": "array", "items": {"type": "array", "minItems": 2, "maxItems": 2}},
+        "style": {"enum": ["line", "area", "dashed"]}, "color": {"type": "string"}
+      }}},
+    "bands": {"type": "array", "items": {
+      "type": "object", "required": ["key", "lower", "upper", "label", "level"],
+      "properties": {"key": {"type": "string"}, "label": {"type": "string"}, "level": {"enum": [0.8, 0.95]},
+                     "lower": {"type": "array"}, "upper": {"type": "array"}, "x": {"type": "array"}}}},
+    "markers": {"type": "array", "items": {"type": "object", "required": ["x", "label", "severity"]}},
+    "regions": {"type": "array", "items": {"type": "object", "required": ["from", "to", "label", "severity"]}},
+    "thresholds": {"type": "array", "items": {"type": "object", "required": ["value", "label"],
+                   "properties": {"value": {"type": "number"}, "label": {"type": "string"}}}},
+    "heatmap": {"type": "object", "required": ["xLabels", "yLabels", "values"],
+                "properties": {"xLabels": {"type": "array"}, "yLabels": {"type": "array"}, "values": {"type": "array", "items": {"type": "array"}}}},
+    "calendar": {"type": "object", "required": ["days"], "properties": {"days": {"type": "array", "items": {"type": "array", "minItems": 2}}}},
+    "gauge": {"type": "object", "required": ["value", "min", "max"]},
+    "timeline": {"type": "object", "required": ["items"], "properties": {"items": {"type": "array", "items": {
+      "type": "object", "required": ["from", "to", "label", "state"]}}}},
+    "gaps": {"type": "boolean"}
+  },
+  "allOf": [
+    {"if": {"properties": {"type": {"const": "heatmap"}}}, "then": {"required": ["heatmap"]}},
+    {"if": {"properties": {"type": {"const": "calendar"}}}, "then": {"required": ["calendar"]}},
+    {"if": {"properties": {"type": {"const": "gauge"}}}, "then": {"required": ["gauge"]}},
+    {"if": {"properties": {"type": {"const": "timeline"}}}, "then": {"required": ["timeline"]}},
+    {"if": {"properties": {"type": {"const": "band"}}}, "then": {"required": ["bands"]}}
+  ],
+  "$defs": {
+    "axis": {"type": "object", "required": ["type"], "properties": {"type": {"enum": ["time", "category", "value"]}, "label": {"type": "string"},
+             "unit": {"type": ["string", "null"]}}}
+  }
+}

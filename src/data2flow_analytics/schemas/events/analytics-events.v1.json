@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://data2flow.java21.net/schemas/analytics/analytics-events.v1.json",
+  "title": "analytics.* 도메인 이벤트 페이로드(EVT-ANA-01~06). 봉투는 contracts domain-event.v1.json",
+  "$defs": {
+    "runStatus": {"type": "object", "required": ["runId", "analysisId", "status", "trigger"],
+      "properties": {"runId": {"type": "string"}, "analysisId": {"type": "string"},
+                     "status": {"enum": ["QUEUED", "PENDING", "RUNNING", "SUCCEEDED", "FAILED", "TIMEOUT", "CANCELLED"]},
+                     "progress": {"type": ["integer", "null"]}, "trigger": {"enum": ["MANUAL", "SCHEDULE", "API"]},
+                     "errorCode": {"type": "string"}, "finishedAt": {"type": "string", "format": "date-time"}}},
+    "anomalyDetected": {"type": "object", "required": ["analysisId", "deviceId", "metricKey", "occurredAt", "value", "score", "kind", "evidence"],
+      "properties": {"analysisId": {"type": "string"}, "deviceId": {"type": "string"}, "metricKey": {"type": "string"},
+                     "occurredAt": {"type": "string", "format": "date-time"}, "value": {"type": "number"}, "score": {"type": "number"},
+                     "kind": {"enum": ["SPIKE", "DROP", "LEVEL_SHIFT", "VARIANCE"]},
+                     "evidence": {"type": "object", "required": ["baseline", "threshold", "contributors"]}}},
+    "etaUpdated": {"type": "object", "required": ["analysisId", "deviceId", "metricKey", "threshold", "direction", "etaAt", "minutesLeft", "confidence"],
+      "properties": {"analysisId": {"type": "string"}, "deviceId": {"type": "string"}, "metricKey": {"type": "string"},
+                     "threshold": {"type": "number"}, "direction": {"enum": ["UP", "DOWN"]}, "etaAt": {"type": "string", "format": "date-time"},
+                     "minutesLeft": {"type": "number"}, "confidence": {"enum": ["HIGH", "MEDIUM", "LOW"]}}},
+    "modelDrift": {"type": "object", "required": ["analysisId", "modelId", "psi", "detectedAt"]},
+    "scheduleStopped": {"type": "object", "required": ["analysisId", "ownerUserId", "consecutiveFailures"]},
+    "exportCompleted": {"type": "object", "required": ["exportJobId", "userId", "downloadUrl", "expiresAt"]}
+  },
+  "x-payloadTypes": {
+    "analytics.run.queued": "runStatus", "analytics.run.pending": "runStatus", "analytics.run.running": "runStatus",
+    "analytics.run.succeeded": "runStatus", "analytics.run.failed": "runStatus", "analytics.run.timeout": "runStatus",
+    "analytics.run.cancelled": "runStatus", "analytics.anomaly.detected": "anomalyDetected", "analytics.eta.updated": "etaUpdated",
+    "analytics.model.drift": "modelDrift", "analytics.schedule.stopped": "scheduleStopped", "analytics.export.completed": "exportCompleted"
+  }
+}

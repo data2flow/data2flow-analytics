@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://data2flow.java21.net/schemas/analytics/result.v1.json",
+  "title": "Analysis Result v1 (ANA-api §4.1, ANA-05.01)",
+  "type": "object",
+  "required": ["summary", "charts", "tables", "caveats", "provenance"],
+  "properties": {
+    "summary": {
+      "type": "object", "required": ["headline", "level", "metrics"],
+      "properties": {
+        "headline": {"type": "string", "minLength": 1},
+        "level": {"enum": ["OK", "WARN", "CRITICAL"]},
+        "metrics": {"type": "array", "items": {"type": "object", "required": ["key", "label", "value"],
+                    "properties": {"key": {"type": "string"}, "label": {"type": "string"}, "unit": {"type": ["string", "null"]},
+                                   "level": {"enum": ["OK", "WARN", "CRITICAL"]}}}},
+        "flags": {"type": "array", "items": {"enum": ["REFERENCE_ONLY", "ESTIMATE", "UNPREDICTABLE", "VIRTUAL_INCLUDED"]}}
+      }
+    },
+    "charts": {"type": "array", "items": {"$ref": "chartspec.v1.json"}},
+    "tables": {"type": "array", "items": {"type": "object", "required": ["id", "title", "columns", "rows"],
+               "properties": {"id": {"type": "string"}, "title": {"type": "string"},
+                              "columns": {"type": "array", "items": {"type": "object", "required": ["key", "label", "type"]}},
+                              "rows": {"type": "array", "items": {"type": "object"}}}}},
+    "evidence": {"type": ["object", "null"]},
+    "caveats": {"type": "array", "items": {"type": "string"}},
+    "provenance": {
+      "type": "object",
+      "required": ["template", "bindings", "period", "resolution", "points", "missingRate", "qualityFilter", "virtual", "seed"],
+      "properties": {
+        "template": {"type": "string", "pattern": "^[a-z][a-z0-9-]*@\\d+\\.\\d+\\.\\d+$"},
+        "bindings": {"type": "array"},
+        "period": {"type": "object", "required": ["from", "to"]},
+        "resolution": {"type": "string"},
+        "points": {"type": "integer", "minimum": 0},
+        "missingRate": {"type": ["number", "null"]},
+        "qualityFilter": {"enum": ["NORMAL_ONLY", "INCLUDE_ALL"]},
+        "virtual": {"type": "boolean"},
+        "seed": {"type": "integer"},
+        "datasetId": {"type": ["string", "null"]},
+        "datasetVersion": {"type": ["integer", "null"]},
+        "algorithm": {"type": "string"}
+      }
+    }
+  }
+}

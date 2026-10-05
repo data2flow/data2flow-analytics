@@ -1,0 +1,206 @@
+{
+ "caveats": [
+  "공간 비교는 용도·면적·재실이 비슷하다고 가정합니다. 용도가 다르면 순위를 그대로 비교하지 마세요."
+ ],
+ "charts": [
+  {
+   "bands": [],
+   "gaps": true,
+   "id": "comfortScore",
+   "markers": [],
+   "regions": [],
+   "series": [
+    {
+     "data": [
+      [
+       "강의실 A",
+       100.0
+      ],
+      [
+       "강의실 B",
+       100.0
+      ]
+     ],
+     "key": "comfortScore",
+     "label": "쾌적도"
+    }
+   ],
+   "thresholds": [],
+   "title": "공간별 쾌적도",
+   "type": "bar",
+   "xAxis": {
+    "label": "공간",
+    "type": "category"
+   },
+   "yAxis": {
+    "label": "쾌적도",
+    "type": "value"
+   }
+  },
+  {
+   "bands": [],
+   "gaps": true,
+   "id": "utilizationPercent",
+   "markers": [],
+   "regions": [],
+   "series": [
+    {
+     "data": [
+      [
+       "강의실 A",
+       null
+      ],
+      [
+       "강의실 B",
+       null
+      ]
+     ],
+     "key": "utilizationPercent",
+     "label": "활용률(%)"
+    }
+   ],
+   "thresholds": [],
+   "title": "공간별 활용률(%)",
+   "type": "bar",
+   "xAxis": {
+    "label": "공간",
+    "type": "category"
+   },
+   "yAxis": {
+    "label": "활용률(%)",
+    "type": "value"
+   }
+  },
+  {
+   "bands": [],
+   "gaps": true,
+   "id": "energyPerM2",
+   "markers": [],
+   "regions": [],
+   "series": [
+    {
+     "data": [
+      [
+       "강의실 A",
+       20.16
+      ],
+      [
+       "강의실 B",
+       null
+      ]
+     ],
+     "key": "energyPerM2",
+     "label": "㎡당 에너지(kWh)"
+    }
+   ],
+   "thresholds": [],
+   "title": "공간별 ㎡당 에너지(kWh)",
+   "type": "bar",
+   "xAxis": {
+    "label": "공간",
+    "type": "category"
+   },
+   "yAxis": {
+    "label": "㎡당 에너지(kWh)",
+    "type": "value"
+   }
+  }
+ ],
+ "evidence": null,
+ "provenance": {
+  "algorithm": "쾌적도·재실 규칙·에너지 합계 순위"
+ },
+ "summary": {
+  "headline": "공간 2곳 비교: 쾌적도 1위 강의실 A",
+  "level": "OK",
+  "metrics": [
+   {
+    "key": "spaces",
+    "label": "공간 수",
+    "unit": null,
+    "value": 2
+   }
+  ]
+ },
+ "tables": [
+  {
+   "columns": [
+    {
+     "key": "name",
+     "label": "공간",
+     "type": "string"
+    },
+    {
+     "key": "purpose",
+     "label": "용도",
+     "type": "string"
+    },
+    {
+     "key": "comfortScore",
+     "label": "쾌적도",
+     "type": "number"
+    },
+    {
+     "key": "comfortScoreRank",
+     "label": "쾌적도 순위",
+     "type": "number"
+    },
+    {
+     "key": "utilizationPercent",
+     "label": "활용률(%)",
+     "type": "number"
+    },
+    {
+     "key": "utilizationPercentRank",
+     "label": "활용률 순위",
+     "type": "number"
+    },
+    {
+     "key": "energyPerM2",
+     "label": "㎡당 kWh",
+     "type": "number"
+    },
+    {
+     "key": "energyPerM2Rank",
+     "label": "에너지 순위(적을수록 1)",
+     "type": "number"
+    },
+    {
+     "key": "reason",
+     "label": "빠진 지표 사유",
+     "type": "string"
+    }
+   ],
+   "id": "ranking",
+   "rows": [
+    {
+     "comfortScore": 100.0,
+     "comfortScoreRank": 1,
+     "energyKwh": 1008.0,
+     "energyPerM2": 20.16,
+     "energyPerM2Rank": 1,
+     "name": "강의실 A",
+     "purpose": null,
+     "reason": "활용률: 재실 신호(CO2·활동) 부족",
+     "spaceId": "1",
+     "utilizationPercent": null,
+     "utilizationPercentRank": null
+    },
+    {
+     "comfortScore": 100.0,
+     "comfortScoreRank": 2,
+     "energyKwh": 2016.0,
+     "energyPerM2": null,
+     "energyPerM2Rank": null,
+     "name": "강의실 B",
+     "purpose": null,
+     "reason": "활용률: 재실 신호(CO2·활동) 부족; ㎡당 에너지: 면적 없음",
+     "spaceId": "2",
+     "utilizationPercent": null,
+     "utilizationPercentRank": null
+    }
+   ],
+   "title": "공간별 지표와 순위"
+  }
+ ]
+}

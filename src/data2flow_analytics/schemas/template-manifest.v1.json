@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://data2flow.java21.net/schemas/analytics/template-manifest.v1.json",
+  "title": "Template manifest v1 (ANA-01.02, TC-ANA-008)",
+  "type": "object",
+  "required": ["key", "version", "name", "kind", "category", "roles", "requirements", "paramsSchema", "fast", "realtime", "trainable", "outputs"],
+  "properties": {
+    "key": {"type": "string", "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"},
+    "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+    "name": {"type": "string", "minLength": 1},
+    "kind": {"enum": ["GENERAL", "DOMAIN"]},
+    "category": {"enum": ["ENV_QUALITY", "SPACE_USAGE", "ASSET_HEALTH", "PREDICTION", "GENERAL"]},
+    "roles": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["name", "type", "min", "max", "required"],
+              "properties": {"type": {"enum": ["series", "multi_series", "event", "group"]}, "min": {"type": "integer", "minimum": 0},
+                             "max": {"type": "integer", "minimum": 1}}}},
+    "requirements": {"type": "object", "required": ["minPeriodDays", "minPoints", "missingWarn", "missingFail", "maxPoints", "recommendedResolution"]},
+    "paramsSchema": {"type": "object", "required": ["type", "properties"]},
+    "fast": {"type": "boolean"}, "realtime": {"type": "boolean"}, "trainable": {"type": "boolean"},
+    "outputs": {"type": "array", "minItems": 1, "items": {"enum": ["line", "band", "scatter", "bar", "heatmap", "calendar", "gauge", "table", "timeline"]}}
+  }
+}
