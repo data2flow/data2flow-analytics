@@ -1,19 +1,38 @@
 [project]
 name = "data2flow-analytics"
-version = "0.1.0"
+version = "0.2.0"
 description = "data2flow 분석 서비스: 분석 템플릿 카탈로그, 충분성 확인, 분석 실행·학습, 실시간 추론 (ANA, ADR-010·011)"
 requires-python = ">=3.12"
+# 라이선스(ADR-018, design/oss-stack.md): 모두 허용 목록(MIT·BSD·Apache·PSF 계열) 또는 조건부(psycopg LGPL-3.0, 수정 없이 사용)
 dependencies = [
-    "fastapi>=0.120",
-    "uvicorn[standard]>=0.38",
-    "prometheus-client>=0.23",
+    "fastapi>=0.120",                 # MIT
+    "uvicorn[standard]>=0.38",        # BSD-3
+    "prometheus-client>=0.23",        # Apache-2.0
+    "psycopg[binary,pool]>=3.2",      # LGPL-3.0 (조건부: 수정하지 않고 동적 사용)
+    "numpy>=2.1",                     # BSD-3
+    "pandas>=2.2",                    # BSD-3
+    "scipy>=1.14",                    # BSD-3
+    "scikit-learn>=1.5",              # BSD-3
+    "statsmodels>=0.14.4",            # BSD-3
+    "ruptures>=1.1.9",                # BSD-2
+    "jsonschema>=4.23",               # MIT
+    "httpx>=0.28",                    # BSD-3 (core-api 내부 API 호출)
+    "pika>=1.3",                      # BSD-3 (data2flow.events 발행, 발행 확인)
+    "rstream>=0.20",                  # MIT (Super Stream data2flow.telemetry 소비)
+    "boto3>=1.35",                    # Apache-2.0 (모델·내보내기 파일 S3 호환 저장소)
+    "matplotlib>=3.9",                # PSF 계열(Matplotlib License) — PNG 서버 렌더
+    "reportlab>=4.2",                 # BSD — PDF 보고서
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.4",
-    "pytest-cov>=7.0",
+    "pytest>=8.4",                    # MIT
+    "pytest-cov>=7.0",                # MIT
     "httpx>=0.28",
+    "testcontainers[postgres,rabbitmq]>=4.8",  # Apache-2.0 (테스트 전용: PostgreSQL 18, RabbitMQ stream)
+    "moto[s3]>=5.0",                  # Apache-2.0 (테스트 전용 가짜 S3)
+    "pypdf>=5.0",                     # BSD-3 (테스트 전용 PDF 글자 추출)
+    "ruff>=0.6",                      # MIT
 ]
 
 [build-system]
@@ -25,7 +44,25 @@ packages = ["src/data2flow_analytics"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=data2flow_analytics --cov-report=term-missing --cov-fail-under=80"
+# 야간 정확도 시험(-m accuracy, 시드 30~50개)은 PR 실행에서 뺀다(ANA test-plan "합성 데이터와 정확도 기준")
+addopts = "-m 'not accuracy' --cov=data2flow_analytics --cov-report=term-missing --cov-fail-under=80"
+markers = [
+    "spec(id): 스펙 ID(예: ANA-02.02). 테스트 이름에는 스펙 ID와 TC·AT ID를 함께 쓴다",
+    "accuracy: 야간 정확도 시험(여러 시드)",
+    "it: Testcontainers를 쓰는 통합 테스트(*_it.py)",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::FutureWarning",
+]
 
 [tool.coverage.run]
 omit = ["src/data2flow_analytics/__main__.py"]
+
+[tool.ruff]
+line-length = 140
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501", "B008"]
