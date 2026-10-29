@@ -3,7 +3,7 @@
 - 작업자 스레드 N개가 READY 작업을 하나씩 잡는다. 같은 작업을 두 워커가 잡지 않는다(SKIP LOCKED).
 - 회수: locked_until이 지난 LOCKED 작업은 READY로 돌리고(실행은 PENDING), attempts가 3이면 DEAD(실행 FAILED, 모델 FAILED).
 - 정리: 보관 기간이 지난 결과 삭제(BR-ANA-15), realtime_events 월 파티션 생성·30일 지난 파티션 삭제(pg_partman 없음, ADR-019),
-  하루 한 번 드리프트·재학습 점검(ANA-07.03·07.04). 정리는 advisory lock으로 한 워커만 한다.
+  하루 한 번 드리프트·재학습 점검(ANA-07.03·07.04), 에너지 일 집계(ENE-01, 조직 시간대 02:00 이후 전날). 정리는 advisory lock으로 한 워커만 한다.
 - SIGTERM: 새 작업을 잡지 않고 진행 중 작업을 마친 뒤 끝낸다(무중단 배포).
 """
 
@@ -17,6 +17,7 @@ from ..analysis import repository as repo
 from ..analysis import runs as runs_mod
 from ..common.errors import ErrorCode
 from ..deps import Deps
+from ..energy.daily import EnergyDaily
 from ..export.service import ExportService
 from ..models.lifecycle import ModelService
 from .runner import RunRunner
@@ -34,6 +35,7 @@ class Worker:
         self.runner = RunRunner(deps, executor)
         self.models = ModelService(deps, executor)
         self.exports = ExportService(deps, analytics_service)
+        self.energy = EnergyDaily(deps)
         self.stop = threading.Event()
         self.name = f"{deps.settings.instance_id}"
         self._last_daily: str | None = None
@@ -108,6 +110,10 @@ class Worker:
         if force_daily or (self._last_daily != today and now.hour >= 1):
             self._last_daily = today
             out["daily"] = self.models.daily_check()
+        try:
+            out["energy"] = self.energy.tick()
+        except Exception:  # noqa: BLE001 — 설정 API에 닿지 않아도 다른 정리는 계속
+            log.exception("energy daily tick failed")
         return out
 
     # ---- 실행 루프 ----

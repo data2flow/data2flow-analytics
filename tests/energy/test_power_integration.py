@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from data2flow_analytics.energy.compute import diff_cumulative, integrate_power, total
+from data2flow_analytics.energy.compute import Interval, clip_hourly, diff_cumulative, integrate_power, total
 
 T0 = datetime(2026, 10, 1, tzinfo=UTC)
 
@@ -34,3 +34,12 @@ def test_ENE_01_01_power_15_minutes_is_not_a_gap():
     """[ENE-01.01] 간격이 정확히 15분이면 추정이 아니다(15분을 넘을 때만), 같은 시각 표본은 건너뛴다"""
     out = integrate_power([(T0, 100.0), (T0, 100.0), (T0 + timedelta(minutes=15), 100.0)])
     assert len(out) == 1 and not out[0].estimated
+
+
+@pytest.mark.spec("ENE-01.02")
+def test_ENE_01_02_clip_hourly_splits_by_overlap():
+    """[ENE-01.02] 시간 칸 경계·날짜 경계를 넘는 구간은 겹친 시간 비율로 나누고 추정 표시를 이어받는다(시간대별 단가용)"""
+    start, end = T0, T0 + timedelta(hours=2)
+    out = clip_hourly([Interval(T0 - timedelta(minutes=30), T0 + timedelta(minutes=30), 1.0),
+                       Interval(T0 + timedelta(minutes=50), T0 + timedelta(hours=2, minutes=10), 4.0, True)], start, end)
+    assert [(i.start, round(i.kwh, 9), i.estimated) for i in out] == [(T0, 0.5 + 0.5, True), (T0 + timedelta(hours=1), 3.0, True)]

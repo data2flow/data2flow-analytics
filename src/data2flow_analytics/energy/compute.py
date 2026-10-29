@@ -59,6 +59,26 @@ def total(intervals: Iterable[Interval]) -> tuple[float, bool]:
     return kwh, estimated
 
 
+def clip_hourly(intervals: Iterable[Interval], start: datetime, end: datetime) -> list[Interval]:
+    """구간들을 [start, end) 안의 1시간 칸으로 나눈다. 칸 경계를 넘는 구간은 겹친 시간 비율로 나누고, 추정 표시는 이어받는다.
+    사용량이 있는 칸만 시각 순으로 돌려준다(날짜 경계 밖 표본이 걸친 구간도 날짜 안 몫만 센다)"""
+    hours: dict[datetime, list] = {}
+    for i in intervals:
+        span = (i.end - i.start).total_seconds()
+        a, b = max(i.start, start), min(i.end, end)
+        if span <= 0 or b <= a:
+            continue
+        cursor = a
+        while cursor < b:
+            slot = start + timedelta(hours=int((cursor - start).total_seconds() // 3600))
+            nxt = min(b, slot + timedelta(hours=1))
+            acc = hours.setdefault(slot, [0.0, False])
+            acc[0] += i.kwh * (nxt - cursor).total_seconds() / span
+            acc[1] |= i.estimated
+            cursor = nxt
+    return [Interval(h, h + timedelta(hours=1), v[0], v[1]) for h, v in sorted(hours.items())]
+
+
 def estimated_usage(rated_power_w: float, standby_power_w: float | None, running: Iterable[tuple[datetime, datetime]],
                     start: datetime, end: datetime) -> float:
     """기간 [start, end)의 추정 사용량(kWh). running은 가동 구간(ACT-08.02), 기간 밖은 잘라 낸다"""

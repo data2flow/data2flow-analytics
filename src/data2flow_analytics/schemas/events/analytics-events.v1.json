@@ -19,12 +19,16 @@
                      "minutesLeft": {"type": "number"}, "confidence": {"enum": ["HIGH", "MEDIUM", "LOW"]}}},
     "modelDrift": {"type": "object", "required": ["analysisId", "modelId", "psi", "detectedAt"]},
     "scheduleStopped": {"type": "object", "required": ["analysisId", "ownerUserId", "consecutiveFailures"]},
-    "exportCompleted": {"type": "object", "required": ["exportJobId", "userId", "downloadUrl", "expiresAt"]}
+    "exportCompleted": {"type": "object", "required": ["exportJobId", "userId", "downloadUrl", "expiresAt"]},
+    "energyDailyUpdated": {"type": "object", "required": ["days", "spaceIds", "recomputed"], "additionalProperties": false,
+      "properties": {"days": {"type": "array", "minItems": 1, "items": {"type": "string", "format": "date"}},
+                     "spaceIds": {"type": "array", "items": {"type": "string", "pattern": "^[1-9][0-9]*$"}}, "recomputed": {"type": "boolean"}}}
   },
   "x-payloadTypes": {
     "analytics.run.queued": "runStatus", "analytics.run.pending": "runStatus", "analytics.run.running": "runStatus",
     "analytics.run.succeeded": "runStatus", "analytics.run.failed": "runStatus", "analytics.run.timeout": "runStatus",
     "analytics.run.cancelled": "runStatus", "analytics.anomaly.detected": "anomalyDetected", "analytics.eta.updated": "etaUpdated",
-    "analytics.model.drift": "modelDrift", "analytics.schedule.stopped": "scheduleStopped", "analytics.export.completed": "exportCompleted"
+    "analytics.model.drift": "modelDrift", "analytics.schedule.stopped": "scheduleStopped", "analytics.export.completed": "exportCompleted",
+    "energy.daily.updated": "energyDailyUpdated"
   }
 }
