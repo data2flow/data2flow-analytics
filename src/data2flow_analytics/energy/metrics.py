@@ -1,7 +1,8 @@
 """에너지 지표·하위 단위(API-ENE-10·11의 계산, 내부 API API-ENE-85). core-api가 권한 범위로 자른 공간 트리를 넘긴다.
 
 - `energy_daily`를 날마다 롤업(rollup.py)해 범위 노드의 값·기타·추정 비율을 내고, 일/월 칸으로 묶는다
-- 비교: 직전 같은 길이 기간(PREVIOUS_PERIOD), 작년 같은 기간(SAME_PERIOD_LAST_YEAR). 기준선(BASELINE)은 ENE-01.04 뒤에 채운다
+- 비교: 직전 같은 길이 기간(PREVIOUS_PERIOD), 작년 같은 기간(SAME_PERIOD_LAST_YEAR), 기준선(BASELINE — core가 활성 버전의 `baselineKey`를 넘긴다).
+  기준선은 데이터가 있는 날마다 예상 kWh를 내(회귀는 그날 기온으로 날씨 보정, TC-ENE-023) 실제와 비교하고 추이에 `baselineKwh`로 싣는다
 - HOUR 칸은 `telemetry_1h`에서 계산하는 별도 경로라 아직 받지 않는다
 """
 
@@ -12,6 +13,8 @@ from datetime import date, timedelta
 
 from ..common.errors import BusinessError, ErrorCode, FieldError
 from ..deps import Deps
+from .baseline import normalized_diff
+from .baselines import EnergyBaselines
 from .compute import eui, per_occupied_hour, round_carbon
 from .rollup import ZERO, Node, Rolled, Usage, area, own_usage, portfolio, rollup, tree
 
@@ -55,6 +58,7 @@ def _r(v: float | None, n: int) -> float | None:
 class EnergyMetrics:
     def __init__(self, deps: Deps):
         self.deps = deps
+        self.baselines = EnergyBaselines(deps)
 
     def metrics(self, org: int, body: dict) -> dict:
         start, end = _date(body, "from"), _date(body, "to")
@@ -80,6 +84,7 @@ class EnergyMetrics:
 
         total, children, other = ZERO, defaultdict(lambda: ZERO), ZERO
         series: dict[str, Usage] = defaultdict(lambda: ZERO)
+        daily_kwh: dict[date, float] = {}
         spaces_with_data: set[int] = set()
         for day, rows in sorted(days.items()):
             rolled = rollup(nodes, own_usage(rows))
@@ -90,13 +95,21 @@ class EnergyMetrics:
                 children[c] = children[c] + rolled[c].usage
             key = day.isoformat() if granularity == "DAY" else day.strftime("%Y-%m")
             series[key] = series[key] + node.usage
+            daily_kwh[day] = node.usage.kwh
             spaces_with_data |= {int(r["space_id"]) for r in rows}
 
         scope_area = areas.get(scope) if scope is not None else _sum([areas.get(r) for r in roots])
         intensity = eui(total.kwh, scope_area)
         per_hour = per_occupied_hour(total.kwh, None, None)  # 재실 시간(occupancy_est)은 OCC·ENE-02.02 뒤에 채운다
-        compared = self._compare(org, nodes, scope, start, end, compare, total) if compare else None
+        if compare == "BASELINE":
+            compared = self._baseline(org, body.get("baselineKey"), daily_kwh)
+        else:
+            compared = self._compare(org, nodes, scope, start, end, compare, total) if compare else None
         prev_children = compared.pop("_children", {}) if compared else {}
+        predicted = compared.pop("_predicted", {}) if compared else {}
+        baseline_series: dict[str, float] = defaultdict(float)
+        for d, v in predicted.items():
+            baseline_series[d.isoformat() if granularity == "DAY" else d.strftime("%Y-%m")] += v
         return {
             "scope": {"spaceId": scope, "name": by_id[scope].name if scope is not None else None, "kind": by_id[scope].kind if scope is not None else None,
                       "areaM2": scope_area},
@@ -106,8 +119,8 @@ class EnergyMetrics:
                        "occupiedHoursReason": per_hour.reason,
                        "estimatedRatio": _r(total.estimated_ratio, 4), "otherCommonKwh": _r(other.kwh, 3)},
             "compare": compared,
-            "series": [{"t": t, "kwh": _r(u.kwh, 3), "krw": _r(u.krw, 2), "tco2": round_carbon(u.tco2), "estimatedKwh": _r(u.estimated_kwh, 3)}
-                       for t, u in sorted(series.items())],
+            "series": [{"t": t, "kwh": _r(u.kwh, 3), "krw": _r(u.krw, 2), "tco2": round_carbon(u.tco2), "estimatedKwh": _r(u.estimated_kwh, 3),
+                        "baselineKwh": _r(baseline_series.get(t), 3)} for t, u in sorted(series.items())],
             "children": [self._child(by_id[c], children[c], areas.get(c), total, prev_children.get(c), c in spaces_with_data or children[c].kwh > 0)
                          for c in child_ids],
             "other": {"kwh": _r(other.kwh, 3)},
@@ -120,9 +133,19 @@ class EnergyMetrics:
                 "euiKwhPerM2": _r(eui(u.kwh, area_m2).value, 4), "estimatedRatio": _r(u.estimated_ratio, 4), "estimated": u.estimated_kwh > 0,
                 "share": None if total.kwh <= 0 else round(u.kwh / total.kwh, 4), "diffRatio": _r(diff, 4), "hasData": has_data}
 
+    def _baseline(self, org: int, key: str | None, daily_kwh: dict[date, float]) -> dict:
+        """기준선 대비(날씨 보정). 예상값이 있는 날만 실제와 맞대 비교한다"""
+        predicted = self.baselines.predict(org, str(key), sorted(daily_kwh)) if key else None
+        if predicted is None:
+            return {"kind": "BASELINE", "kwh": None, "diffRatio": None, "reason": "NO_BASELINE"}
+        if not predicted:
+            return {"kind": "BASELINE", "kwh": None, "diffRatio": None, "reason": "NO_WEATHER"}
+        expected = sum(predicted.values())
+        actual = sum(daily_kwh[d] for d in predicted)
+        return {"kind": "BASELINE", "baselineKey": key, "kwh": _r(expected, 3), "actualKwh": _r(actual, 3),
+                "diffRatio": _r(normalized_diff(actual, expected), 4), "coveredDays": len(predicted), "_predicted": predicted}
+
     def _compare(self, org: int, nodes: list[Node], scope: int | None, start: date, end: date, kind: str, total: Usage) -> dict:
-        if kind == "BASELINE":
-            return {"kind": kind, "kwh": None, "diffRatio": None, "reason": "NO_BASELINE"}
         if kind == "PREVIOUS_PERIOD":
             length = (end - start).days + 1
             p_start, p_end = start - timedelta(days=length), start - timedelta(days=1)

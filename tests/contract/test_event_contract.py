@@ -23,6 +23,8 @@ SAMPLES = {
     "analytics.schedule.stopped": {"analysisId": "2", "ownerUserId": "7", "consecutiveFailures": 3},
     "analytics.export.completed": {"exportJobId": "9", "userId": "7", "downloadUrl": "/bff/download/x", "expiresAt": "2026-10-06T00:00:00Z"},
     "energy.daily.updated": {"days": ["2026-10-04"], "spaceIds": ["31"], "recomputed": False},
+    "energy.baseline.trained": {"versionId": 12, "status": "READY", "r2": 0.93, "coefficients": {"intercept": 50.0, "cdd": 8.0, "hdd": 0.0, "weekend": 0.0},
+                                "residualsRef": "bl-12", "warning": None, "error": None, "neededDays": None, "trainedDays": 60},
 }
 
 

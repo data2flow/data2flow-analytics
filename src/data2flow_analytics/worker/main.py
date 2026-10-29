@@ -17,6 +17,8 @@ from ..analysis import repository as repo
 from ..analysis import runs as runs_mod
 from ..common.errors import ErrorCode
 from ..deps import Deps
+from ..energy.baselines import JOB as BASELINE
+from ..energy.baselines import EnergyBaselines
 from ..energy.daily import EnergyDaily
 from ..export.service import ExportService
 from ..models.lifecycle import ModelService
@@ -36,6 +38,7 @@ class Worker:
         self.models = ModelService(deps, executor)
         self.exports = ExportService(deps, analytics_service)
         self.energy = EnergyDaily(deps)
+        self.baselines = EnergyBaselines(deps)
         self.stop = threading.Event()
         self.name = f"{deps.settings.instance_id}"
         self._last_daily: str | None = None
@@ -52,6 +55,8 @@ class Worker:
             return self.runner.process(job)
         if job["type"] == "TRAIN":
             return self.models.process(job)
+        if job["type"] == BASELINE:
+            return self.baselines.process(job)
         return self.exports.process(job)
 
     def drain(self, limit: int = 100) -> list[str]:
@@ -67,7 +72,7 @@ class Worker:
     def reap(self) -> dict:
         now = self.deps.clock.now()
         out = {"ready": 0, "dead": 0}
-        events = []
+        events, baselines = [], []
         with self.deps.pool.connection() as conn:
             for job in repo.expired_locks(conn, now):
                 if job["attempts"] >= 3:
@@ -84,6 +89,8 @@ class Worker:
                     elif job["type"] == "TRAIN":
                         conn.execute(f"UPDATE {repo.S}.model_artifacts SET status = 'FAILED', updated_at = %s WHERE id = %s "
                                      "AND status = 'TRAINING'", (now, job["ref_id"]))
+                    elif job["type"] == BASELINE:
+                        baselines.append(job)
                 else:
                     repo.retry_job(conn, job["id"], job.get("last_error") or "lease expired", now, now)
                     out["ready"] += 1
@@ -93,6 +100,8 @@ class Worker:
                             events.append(run)
         for run in events:
             self.runner._publish_run(run)
+        for job in baselines:  # 3번 실패한 기준선 학습은 core 버전이 TRAINING에 머물지 않게 FAILED를 알린다
+            self.baselines.publish_failed(int(job["organization_id"]), int(job["ref_id"]), ErrorCode.INTERNAL_ERROR.name)
         return out
 
     # ---- 정리 ----
