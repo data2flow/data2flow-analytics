@@ -29,6 +29,7 @@ DRIFT = "analytics.model.drift"  # EVT-ANA-04
 SCHEDULE_STOPPED = "analytics.schedule.stopped"  # EVT-ANA-05
 EXPORT_COMPLETED = "analytics.export.completed"  # EVT-ANA-06
 ENERGY_DAILY = "energy.daily.updated"  # EVT-ENE-01
+ENERGY_BASELINE_TRAINED = "energy.baseline.trained"  # EVT-ENE-02
 
 
 def own_event(event_type: str) -> bool:

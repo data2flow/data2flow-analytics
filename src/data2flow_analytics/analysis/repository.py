@@ -281,7 +281,7 @@ def insert_job(conn: Connection, org: int, job_type: str, ref_id: int, now: date
         (org, job_type, ref_id, status, locked_by, locked_until, 1 if status == "LOCKED" else 0, now, j(payload or {}), now, now)).fetchone()
 
 
-def claim_job(conn: Connection, worker: str, now: datetime, lease_sec: int, types: tuple[str, ...] = ("RUN", "TRAIN", "EXPORT")) -> dict | None:
+def claim_job(conn: Connection, worker: str, now: datetime, lease_sec: int, types: tuple[str, ...] = ("RUN", "TRAIN", "EXPORT", "BASELINE")) -> dict | None:
     return conn.execute(
         f"""UPDATE {S}.jobs SET status = 'LOCKED', locked_by = %(worker)s, locked_until = %(until)s, attempts = attempts + 1,
                updated_at = %(now)s

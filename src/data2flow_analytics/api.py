@@ -309,6 +309,15 @@ def create_app(services: Any = None) -> FastAPI:
     def energy_metrics(request: Request, body: dict = Body(default_factory=dict)):
         return ok(svc(request).energy.metrics(Identity(request).org, body))
 
+    # ------------------------------------------------------------ 기준선 학습(API-ENE-81 ← core API-ENE-12, 결과는 EVT-ENE-02)
+    @app.post(f"{P}/energy/baselines/train")
+    def energy_baseline_train(request: Request, body: dict = Body(default_factory=dict)):
+        return ok(svc(request).baselines.request(Identity(request).org, body), 202)
+
+    @app.get(P + "/energy/baselines/{key}")
+    def energy_baseline(request: Request, key: str):
+        return ok(svc(request).baselines.get(Identity(request).org, key))
+
     return app
 
 
