@@ -9,17 +9,17 @@ from data2flow_analytics.db.migrate import Migration, MigrationError, discover, 
 
 
 def test_migration_applied_and_validates(conninfo):
-    """V1이 적용되어 17개 테이블과 Flyway 이력이 있고, validate가 통과한다. 다시 migrate해도 아무것도 하지 않는다"""
+    """모든 마이그레이션이 적용되어 18개 테이블과 Flyway 이력이 있고, validate가 통과한다. 다시 migrate해도 아무것도 하지 않는다"""
     validate(conninfo)
     assert migrate(conninfo) == []
     run(conninfo, "none")
     with psycopg.connect(conninfo) as conn:
         tables = conn.execute("""SELECT count(*) FROM pg_tables WHERE schemaname = 'data2flow_analytics'
                                  AND tablename NOT LIKE 'realtime_events_%' AND tablename <> 'flyway_schema_history'""").fetchone()[0]
-        history = conn.execute("SELECT version, type, success, checksum FROM data2flow_analytics.flyway_schema_history").fetchall()
-    assert tables == 17
-    mig = discover()[0]
-    assert history == [(mig.version, "SQL", True, mig.checksum())]
+        history = conn.execute("SELECT version, type, success, checksum FROM data2flow_analytics.flyway_schema_history "
+                               "ORDER BY installed_rank").fetchall()
+    assert tables == 18
+    assert history == [(mig.version, "SQL", True, mig.checksum()) for mig in discover()]
     with pytest.raises(MigrationError):
         run(conninfo, "weird")
 

@@ -2,6 +2,7 @@
 
 - API-DEV-128 `GET /internal/core/spaces/{space-id}/devices?relation=MEASURES&includeDescendants=true` — 공간 집계 바인딩을 기기 목록으로 푼다
 - API-DEV-126 `GET /internal/core/spaces/{space-id}/targets` — 쾌적도의 공간 목표 환경(DEV-01.04)
+- API-ENE-70 `GET /internal/core/energy/config?orgId=`·`/internal/core/energy/organizations` — 에너지 일 집계 설정 묶음과 대상 조직
 """
 
 from __future__ import annotations
@@ -49,6 +50,13 @@ class CoreClient:
             key = METRIC_SEMANTIC.get(str(item.get("metricKey", "")).lower(), item.get("metricKey"))
             out[key] = {"min": item.get("min"), "max": item.get("max")}
         return out or None
+
+    def energy_organizations(self) -> list[int]:
+        body = self._get("/internal/core/energy/organizations") or {}
+        return [int(o) for o in body.get("organizationIds") or []]
+
+    def energy_config(self, org: int) -> dict:
+        return self._get("/internal/core/energy/config", {"orgId": org}) or {}
 
 
 #: 표준 측정 항목 키 → 의미 태그(DEV-04 semantic). 바인딩에 semantic이 없을 때 의미 조건 검사에 쓴다(BR-ANA-02)

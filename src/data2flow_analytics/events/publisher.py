@@ -1,8 +1,9 @@
 """도메인 이벤트 발행(ANA-api §3, architecture.md §4.5).
 
-topic exchange `data2flow.events`, 라우팅 키 = type(`analytics.*`). 본문은 contracts의 도메인 이벤트 봉투
+topic exchange `data2flow.events`, 라우팅 키 = type(`analytics.*`, 에너지 계산 결과 `energy.*` — ENE §5 EVT-ENE-01~06). 본문은 contracts의 도메인 이벤트 봉투
 `{v, messageId, type, organizationId, occurredAt, requestId?, payload}`, 헤더는 messageId·v·organizationId·occurredAt·X-REQUEST-ID.
-analytics는 `analytics.*`만 발행하고 제어 명령(`command.*`)은 보내지 않는다(BR-ANA-13, TC-ANA-163) — 발행 전에 막는다.
+analytics는 자기 이벤트(`analytics.*`·`energy.*`, core가 내는 `energy.config.*` 제외)만 발행하고 제어 명령(`command.*`)은 보내지 않는다
+(BR-ANA-13, TC-ANA-163) — 발행 전에 막는다.
 """
 
 from __future__ import annotations
@@ -27,6 +28,12 @@ ETA = "analytics.eta.updated"  # EVT-ANA-03
 DRIFT = "analytics.model.drift"  # EVT-ANA-04
 SCHEDULE_STOPPED = "analytics.schedule.stopped"  # EVT-ANA-05
 EXPORT_COMPLETED = "analytics.export.completed"  # EVT-ANA-06
+ENERGY_DAILY = "energy.daily.updated"  # EVT-ENE-01
+
+
+def own_event(event_type: str) -> bool:
+    """analytics가 낼 수 있는 이벤트인가(BR-ANA-13)"""
+    return event_type.startswith("analytics.") or (event_type.startswith("energy.") and not event_type.startswith("energy.config."))
 
 
 @dataclass(frozen=True)
@@ -56,8 +63,8 @@ class EventPublisher(Protocol):
 
 
 def make_event(clock: Clock, event_type: str, organization_id: int, payload: dict, request_id: str | None = None) -> DomainEvent:
-    if not event_type.startswith("analytics."):
-        raise ValueError(f"analytics는 analytics.* 이벤트만 발행한다(BR-ANA-13): {event_type}")
+    if not own_event(event_type):
+        raise ValueError(f"analytics는 analytics.*·energy.* 이벤트만 발행한다(BR-ANA-13): {event_type}")
     return DomainEvent(event_type, int(organization_id), payload, clock.now(), str(uuid.uuid4()), request_id)
 
 
@@ -101,8 +108,8 @@ class RabbitPublisher:
     def publish(self, event: DomainEvent) -> None:
         import pika
 
-        if not event.type.startswith("analytics."):
-            raise ValueError("BR-ANA-13: analytics.* 이외 발행 금지")
+        if not own_event(event.type):
+            raise ValueError("BR-ANA-13: analytics.*·energy.* 이외 발행 금지")
         body = json.dumps(event.envelope(), ensure_ascii=False).encode("utf-8")
         props = pika.BasicProperties(content_type="application/json", delivery_mode=2, message_id=event.message_id,
                                      headers=event.headers(), app_id="data2flow-analytics", type=event.type)

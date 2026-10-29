@@ -22,6 +22,7 @@ SAMPLES = {
     "analytics.model.drift": {"analysisId": "2", "modelId": "3", "psi": 0.31, "detectedAt": "2026-10-05T00:00:00Z"},
     "analytics.schedule.stopped": {"analysisId": "2", "ownerUserId": "7", "consecutiveFailures": 3},
     "analytics.export.completed": {"exportJobId": "9", "userId": "7", "downloadUrl": "/bff/download/x", "expiresAt": "2026-10-06T00:00:00Z"},
+    "energy.daily.updated": {"days": ["2026-10-04"], "spaceIds": ["31"], "recomputed": False},
 }
 
 
