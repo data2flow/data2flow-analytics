@@ -14,6 +14,7 @@ from .config import Settings
 from .db import create_pool
 from .db.migrate import run as run_migrations
 from .deps import Deps
+from .energy.metrics import EnergyMetrics
 from .events.publisher import EventPublisher, RabbitPublisher, RecordingPublisher
 from .export.service import ExportService
 from .kpi import KpiService
@@ -35,6 +36,7 @@ class Services:
     models: ModelService
     exports: ExportService
     kpis: KpiService
+    energy: EnergyMetrics
 
     def close(self) -> None:
         closer = getattr(self.deps.publisher, "close", None)
@@ -58,7 +60,8 @@ def sync_registry(deps: Deps) -> None:
 def make_services(deps: Deps, subprocess_runs: bool = False) -> Services:
     analytics = AnalyticsService(deps)
     executor = SubprocessExecutor(deps.extra_template_dirs) if subprocess_runs else InlineExecutor(deps.registry)
-    return Services(deps, analytics, DatasetService(deps), ModelService(deps, executor), ExportService(deps, analytics), KpiService(deps))
+    return Services(deps, analytics, DatasetService(deps), ModelService(deps, executor), ExportService(deps, analytics), KpiService(deps),
+                    EnergyMetrics(deps))
 
 
 def build_deps(settings: Settings, *, clock: Clock | None = None, publisher: EventPublisher | None = None,

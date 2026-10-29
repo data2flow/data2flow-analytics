@@ -304,6 +304,11 @@ def create_app(services: Any = None) -> FastAPI:
     def kpis(request: Request, body: dict = Body(default_factory=dict)):
         return ok(svc(request).kpis.compute(Identity(request).org, body))
 
+    # ------------------------------------------------------------ 에너지 지표(API-ENE-85 ← core API-ENE-10·11)
+    @app.post(f"{P}/energy/metrics")
+    def energy_metrics(request: Request, body: dict = Body(default_factory=dict)):
+        return ok(svc(request).energy.metrics(Identity(request).org, body))
+
     return app
 
 
