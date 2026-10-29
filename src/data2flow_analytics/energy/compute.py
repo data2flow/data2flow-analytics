@@ -88,8 +88,13 @@ def estimated_usage(rated_power_w: float, standby_power_w: float | None, running
         if b > a:
             run += (b - a).total_seconds()
     span = max(0.0, (end - start).total_seconds())
-    run = min(run, span)
-    return (rated_power_w * run + (standby_power_w or 0) * (span - run)) / 3600 / 1000
+    return estimated_kwh(rated_power_w, standby_power_w, run, span)
+
+
+def estimated_kwh(rated_power_w: float, standby_power_w: float | None, on_seconds: float, span_seconds: float) -> float:
+    """정격 × 가동 시간 + 대기 × 나머지(kWh). 가동 시간은 기간을 넘지 않는다"""
+    run = min(max(0.0, on_seconds), span_seconds)
+    return (rated_power_w * run + (standby_power_w or 0) * (span_seconds - run)) / 3600 / 1000
 
 
 def _merge(ranges: Iterable[tuple[datetime, datetime]]) -> list[tuple[datetime, datetime]]:

@@ -28,3 +28,24 @@ def test_ENE_01_01_TC_ENE_003_metered_wins():
     usage = pick_source(10.0, 9.68)
     assert (usage.kwh, usage.source, usage.comparison) == (10.0, METERED, 9.68)
     assert pick_source(None, None).kwh is None
+
+
+@pytest.mark.spec("ENE-01.01")
+def test_ENE_01_01_action_runtime_client():
+    """[ENE-01.01] action 가동 시간 조회: 500개씩 나눠 묻고 호출자 표시를 붙인다"""
+    import httpx
+
+    from data2flow_analytics.loader.action_client import ActionClient
+
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        ids = request.url.params["deviceIds"].split(",")
+        return httpx.Response(200, json={"response": {"items": [{"deviceId": ids[0], "onSeconds": 60}]}})
+
+    client = ActionClient("http://action", transport=httpx.MockTransport(handler))
+    out = client.on_seconds(1, DAY.date(), list(range(1, 602)))
+    assert out == {1: 60, 501: 60}
+    assert len(seen) == 2 and seen[0].headers["X-CALLER-SERVICE"] == "data2flow-analytics"
+    assert seen[0].url.params["date"] == "2026-10-01" and seen[0].url.params["orgId"] == "1"
