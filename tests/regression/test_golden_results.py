@@ -1,7 +1,7 @@
 """골든 결과 회귀(TC-ANA-182): 템플릿별 고정 입력 결과를 golden/*.json과 비교한다.
 
 의존성(numpy·scikit-learn·statsmodels) 업그레이드 PR에서 상대 오차 1e-6을 넘으면 실패한다. 최적화기를 쓰는 예측(forecast)은
-플랫폼 간 부동소수 차이를 허용해 1e-3으로 본다. 골든을 다시 만들 때는 `UPDATE_GOLDEN=1 pytest tests/regression`.
+플랫폼 간 부동소수 차이를 허용해 1e-3으로 보고, 요약 문장 속 숫자(예: "평균 691.6ppm")도 같은 오차로 본다. 골든을 다시 만들 때는 `UPDATE_GOLDEN=1 pytest tests/regression`.
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,7 @@ from tests.fixtures.samples import sample
 GOLDEN = Path(__file__).parent / "golden"
 REG = build_registry()
 LOOSE = {"forecast": 1e-3}
+NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
 
 
 def _compare(a, b, rel: float, path: str = "") -> list[str]:
@@ -34,6 +36,12 @@ def _compare(a, b, rel: float, path: str = "") -> list[str]:
         return [d for i, (x, y) in enumerate(zip(a, b, strict=True)) for d in _compare(x, y, rel, f"{path}[{i}]")]
     if isinstance(a, float) and isinstance(b, (int, float)) and not isinstance(b, bool):
         return [] if math.isclose(a, b, rel_tol=rel, abs_tol=1e-9) else [f"{path}: {a} != {b}"]
+    if isinstance(a, str) and isinstance(b, str) and rel > 1e-6 and a != b:
+        # 문장 속 숫자는 반올림된 값이라 오차 안이면 같은 것으로 본다. 숫자 밖 글자는 그대로 같아야 한다
+        xs, ys = NUMBER.findall(a), NUMBER.findall(b)
+        same = (NUMBER.sub("#", a) == NUMBER.sub("#", b) and len(xs) == len(ys)
+                and all(math.isclose(float(x), float(y), rel_tol=rel) for x, y in zip(xs, ys, strict=True)))
+        return [] if same else [f"{path}: {a!r} != {b!r}"]
     return [] if a == b else [f"{path}: {a!r} != {b!r}"]
 
 
