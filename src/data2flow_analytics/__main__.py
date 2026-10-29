@@ -20,10 +20,17 @@ from .management import app as management_app
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
+# httptools 파서는 `Upgrade: h2c`가 붙은 요청의 본문을 버린다(ADR-060). 호출 쪽이 HTTP/1.1로 고정해도 서버에서 한 번 더 막는다
+HTTP_IMPL = "h11"
+
+
+def api_config(app, port: int, **kwargs) -> uvicorn.Config:
+    return uvicorn.Config(app, host="0.0.0.0", port=port, http=HTTP_IMPL, **kwargs)
+
 
 async def serve_api() -> None:
-    api = uvicorn.Server(uvicorn.Config(api_app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")), timeout_graceful_shutdown=30))
-    mgmt = uvicorn.Server(uvicorn.Config(management_app, host="0.0.0.0", port=int(os.getenv("MANAGEMENT_PORT", "8081")), access_log=False))
+    api = uvicorn.Server(api_config(api_app, int(os.getenv("PORT", "8080")), timeout_graceful_shutdown=30))
+    mgmt = uvicorn.Server(api_config(management_app, int(os.getenv("MANAGEMENT_PORT", "8081")), access_log=False))
     await asyncio.gather(api.serve(), mgmt.serve())
 
 
@@ -36,7 +43,7 @@ async def serve_worker() -> None:
     services = await asyncio.to_thread(build_services, "worker")
     deps = services.deps
     worker = Worker(deps, services.models.executor, services.analytics)
-    mgmt = uvicorn.Server(uvicorn.Config(management_app, host="0.0.0.0", port=int(os.getenv("MANAGEMENT_PORT", "8081")), access_log=False))
+    mgmt = uvicorn.Server(api_config(management_app, int(os.getenv("MANAGEMENT_PORT", "8081")), access_log=False))
     consumer = None
     loop = asyncio.get_running_loop()
 
