@@ -98,7 +98,8 @@ def deps(conninfo, clock, tmp_path):
                         data2flow_analytics.dataset_versions, data2flow_analytics.datasets, data2flow_analytics.template_settings CASCADE""")
         conn.execute("""TRUNCATE data2flow_pipeline.telemetry, data2flow_pipeline.telemetry_long, data2flow_pipeline.telemetry_1m,
                         data2flow_pipeline.telemetry_1h, data2flow_pipeline.telemetry_1d, data2flow_pipeline.device_state,
-                        data2flow_pipeline.data_quality_daily, data2flow_pipeline.agg_watermarks""")
+                        data2flow_pipeline.data_quality_daily, data2flow_pipeline.agg_watermarks,
+                        data2flow_pipeline.agg_dirty_ranges""")
     settings = Settings(profile="test", events_enabled=False, realtime_enabled=False, instance_id="test", sync_wait_sec=60.0,
                         store_dir=str(tmp_path / "store"))
     d = Deps(settings=settings, pool=pool, registry=build_registry(), loader=TelemetryLoader(pool, FakeCore()),

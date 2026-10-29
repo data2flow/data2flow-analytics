@@ -23,6 +23,7 @@ from .core_client import CoreLookup
 PIPE = "data2flow_pipeline"
 RES_INTERVAL = {"1m": "1 minute", "1h": "1 hour", "1d": "1 day"}
 RES_SECONDS = {"RAW": None, "1m": 60, "1h": 3600, "1d": 86400}
+ORDER_AGG = ["1m", "1h", "1d"]
 #: 1d 집계와 같은 기준(사이트 시간대 자정, BR-TSD-05). 기본 Asia/Seoul
 DAY_ORIGIN = "2000-01-01 00:00:00+09"
 
@@ -143,6 +144,7 @@ class TelemetryLoader:
             # 연속 집계 테이블은 워터마크까지만 확정이다(TSD). 그 뒤는 원본에서 같은 방식으로 묶는다
             mark = conn.execute(f"SELECT processed_until FROM {PIPE}.agg_watermarks WHERE level = %s", (req.resolution,)).fetchone()
             until = min(req.period_to, mark["processed_until"]) if mark else req.period_from
+            until = self._before_dirty(conn, req, params, until)
             rows: list = []
             if until > req.period_from:
                 table = f"{PIPE}.telemetry_{req.resolution}"
@@ -163,6 +165,21 @@ class TelemetryLoader:
             return _series(rows), (_series(rows, "q") if needs_quality else None)
         rows = self._binned(conn, req, src, params, virtual, agg_fn, needs_quality)
         return _series(rows), (_series(rows, "q") if needs_quality else None)
+
+    def _before_dirty(self, conn, req: LoadRequest, params: dict, until):
+        """워터마크 앞이라도 다시 계산을 기다리는 구간(agg_dirty_ranges: 늦게 온 값·가져오기·재처리)은 집계가 비었거나 낡았다.
+        그 구간의 첫 집계 단위부터는 원본에서 묶는다. 1m 구간은 1h → 1d로 차례로 넘어가므로 요청 단위 이하를 모두 본다."""
+        if until <= req.period_from:
+            return until
+        levels = ORDER_AGG[: ORDER_AGG.index(req.resolution) + 1]
+        origin = DAY_ORIGIN if req.resolution == "1d" else "2000-01-01 00:00:00+00"
+        row = conn.execute(
+            f"SELECT date_bin(interval '{RES_INTERVAL[req.resolution]}', min(from_ts), timestamptz '{origin}') AS first "
+            f"FROM {PIPE}.agg_dirty_ranges WHERE organization_id = %(org)s AND level = ANY(%(levels)s) "
+            "AND device_id = ANY(%(devices)s) AND metric_key = %(metric)s AND to_ts > %(from)s AND from_ts < %(until)s",
+            {**params, "levels": levels, "until": until}).fetchone()
+        first = row["first"] if row else None
+        return max(req.period_from, min(until, first)) if first else until
 
     def _binned(self, conn, req: LoadRequest, src: Source, params: dict, virtual: str, agg_fn: str, needs_quality: bool) -> list:
         """원본을 집계 단위(date_bin)로 묶는다. 1d는 사이트 시간대 자정 기준."""

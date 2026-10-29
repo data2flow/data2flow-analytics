@@ -52,6 +52,27 @@ def test_ANA_01_05_TC_ANA_022_three_binding_kinds(deps):
     assert len(deps.loader.load(_req(bindings, "1h"), ANOMALY).role("target")) == 30 * 24  # 집계 테이블만으로 읽는다
 
 
+@pytest.mark.spec("ANA-01.05")
+def test_ANA_01_05_backfill_before_watermark_reads_raw_until_recomputed(deps):
+    """[ANA-01.05][TSD-02.02] 워터마크 앞에 방금 넣은 과거 데이터는 다시 계산(agg_dirty_ranges)이 끝날 때까지 원본에서 묶는다.
+    충분성은 통과하는데 집계 테이블이 비어 "데이터 없음"으로 실패하던 문제(M5·M6 시연)"""
+    bindings = [{"role": "target", "sources": [{"kind": "DEVICE_METRIC", "deviceId": "301", "metricKey": "co2"}]}]
+    with deps.pool.connection() as conn:
+        insert_telemetry(conn, 301, "co2", _series(1, days=30))
+        aggregate(conn, "1h")
+        older = _series(2, days=30).copy()
+        older.index = older.index - timedelta(days=30)
+        insert_telemetry(conn, 301, "co2", older)  # 가져오기: 워터마크보다 앞, 아직 집계 전
+        conn.execute("""INSERT INTO data2flow_pipeline.agg_dirty_ranges (organization_id, level, device_id, metric_key, from_ts, to_ts, reason)
+                        VALUES (%s, '1m', 301, 'co2', %s, %s, 'IMPORT')""", (ORG, older.index[0], older.index[-1] + timedelta(minutes=1)))
+    frame = deps.loader.load(_req(bindings, "1h", days=60), ANOMALY).role("target")
+    assert len(frame) == 60 * 24 and frame.notna().all().all()
+    with deps.pool.connection() as conn:
+        conn.execute("TRUNCATE data2flow_pipeline.agg_dirty_ranges")  # 다시 계산이 끝나면 집계 테이블만 읽는다
+        conn.execute("DELETE FROM data2flow_pipeline.telemetry WHERE time < %s", (T0 - timedelta(days=30),))
+    assert len(deps.loader.load(_req(bindings, "1h", days=60), ANOMALY).role("target")) == 30 * 24
+
+
 @pytest.mark.spec("ANA-03.04")
 def test_ANA_03_04_TC_ANA_090_quality_filter(deps):
     """[ANA-03.04][TC-ANA-090] NORMAL_ONLY면 품질 0만, INCLUDE_ALL이면 1(범위 초과)·3(의심)도. provenance에 필터 기록"""
