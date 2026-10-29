@@ -197,6 +197,15 @@ class EnergyBaselines:
                                 (org, int(source["deviceId"]), source["metricKey"], lo, hi)).fetchall()
         return daily_means(((r["bucket"], r["avg"]) for r in rows), tz)
 
+    # ---- 모델 조회(core 버전 상세의 잔차) ----
+    def get(self, org: int, key: str) -> dict:
+        with self.deps.pool.connection() as conn:
+            row = conn.execute(f"SELECT * FROM {S}.baseline_models WHERE organization_id = %s AND key = %s", (org, key)).fetchone()
+        if row is None:
+            raise BusinessError(ErrorCode.RESOURCE_NOT_FOUND)
+        return to_jsonable({"key": row["key"], "method": row["method"], "coefficients": row["coefficients"], "r2": row["r2"],
+                            "residuals": row["residuals"] or [], "warnings": (row["scope"] or {}).get("warnings") or [], "trainedAt": row["trained_at"]})
+
     # ---- 지표의 기준선 비교 ----
     def load(self, org: int, key: str) -> tuple[Model, dict] | None:
         with self.deps.pool.connection() as conn:

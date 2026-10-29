@@ -73,6 +73,10 @@ def test_regression_trains_and_publishes_ready(client, deps, worker):
         row = conn.execute("SELECT * FROM data2flow_analytics.baseline_models WHERE organization_id = %s AND key = 'bl-12'", (ORG,)).fetchone()
     assert row["method"] == "DEGREE_DAY_REGRESSION" and len(row["residuals"]) == 60
     assert row["scope"]["temperatureSource"] == TEMP and SIM in row["scope"]["spaceIds"]
+    got = client.get("/internal/analytics/energy/baselines/bl-12", headers=HEADERS)
+    assert got.status_code == 200 and len(got.json()["response"]["residuals"]) == 60
+    assert got.json()["response"]["residuals"][0] == {"date": "2026-08-01", "actual": 50.0 + 8 * _cdd(0), "predicted": pytest.approx(50.0 + 8 * _cdd(0))}
+    assert client.get("/internal/analytics/energy/baselines/bl-404", headers=HEADERS).status_code == 404
 
 
 def test_period_average_needs_no_weather(client, deps, worker):

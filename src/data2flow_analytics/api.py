@@ -314,6 +314,10 @@ def create_app(services: Any = None) -> FastAPI:
     def energy_baseline_train(request: Request, body: dict = Body(default_factory=dict)):
         return ok(svc(request).baselines.request(Identity(request).org, body), 202)
 
+    @app.get(P + "/energy/baselines/{key}")
+    def energy_baseline(request: Request, key: str):
+        return ok(svc(request).baselines.get(Identity(request).org, key))
+
     return app
 
 
