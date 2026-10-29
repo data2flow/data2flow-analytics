@@ -2,7 +2,9 @@
 
 - 매일 조직 시간대 02:00이 지나면 전날을 확정한다. 원천의 날짜 경계는 원천 사이트 시간대 자정이다
 - 측정 원천: 원본 텔레메트리(품질 정상)를 누적이면 차분, 순간 전력이면 사다리꼴 적분하고 1시간 칸으로 나눠 그 시각의 단가로 비용을 낸다(BR-ENE-03·05)
-- 공간 × 출처마다 한 행(kWh·원·tCO2·추정 포함 여부). 추정 원천(BR-ENE-04)은 가동 시간(action 가동 집계 ACT-08.02)을 받을 창구가 생기면 더한다
+- 추정 원천(BR-ENE-04): 정격 × 그날 가동 시간(action 가동 집계 ACT-08.02) + 대기 × 나머지. 가동 기록이 없으면 대기 전력만, action에 닿지 않으면
+  그날 추정 행을 쓰지 않는다. 시간대별 단가는 하루에 고르게 나눠 적용한다
+- 공간 × 출처마다 한 행(kWh·원·tCO2·추정 포함 여부)
 - 서버가 여러 대여도 조직별 advisory lock 안에서 `energy_daily_runs`를 먼저 넣은 인스턴스만 쓰고 EVT-ENE-01을 한 번 낸다
 - 설정 묶음(API-ENE-70)은 5분 캐시한다
 """
@@ -16,8 +18,21 @@ from zoneinfo import ZoneInfo
 
 from ..deps import Deps
 from ..events import publisher as ev
+from ..loader.action_client import ActionClient, RuntimeLookup
 from ..loader.loader import _raw_union
-from .compute import METERED, EmissionFactor, Tariff, Tariffs, carbon, clip_hourly, cost, diff_cumulative, integrate_power
+from .compute import (
+    ESTIMATED,
+    METERED,
+    EmissionFactor,
+    Tariff,
+    Tariffs,
+    carbon,
+    clip_hourly,
+    cost,
+    diff_cumulative,
+    estimated_kwh,
+    integrate_power,
+)
 
 log = logging.getLogger("data2flow_analytics.energy")
 
@@ -38,8 +53,9 @@ class _Acc:
 
 
 class EnergyDaily:
-    def __init__(self, deps: Deps):
+    def __init__(self, deps: Deps, action: RuntimeLookup | None = None):
         self.deps = deps
+        self.action = action if action is not None else ActionClient(deps.settings.action_uri)
         self._configs: dict[int, tuple[datetime, dict]] = {}
         self._orgs: tuple[datetime | None, list[int]] = (None, [])
 
@@ -133,13 +149,26 @@ class EnergyDaily:
         holidays = {int(site): frozenset(date.fromisoformat(d) for d in days) for site, days in (cfg.get("holidays") or {}).items()}
         factors = [EmissionFactor(date.fromisoformat(f["validFrom"]), float(f["factorTco2PerMwh"])) for f in cfg.get("emissionFactors") or []]
         acc: dict[tuple[int, str], _Acc] = {}
-        for src in cfg.get("meterSources") or []:
-            if src.get("kind") != METERED:
-                continue
+        sources = cfg.get("meterSources") or []
+        running = self._running(org, day, [int(s["deviceId"]) for s in sources if s.get("kind") == ESTIMATED])
+        for src in sources:
             site = int(src["siteId"]) if src.get("siteId") else None
             tz = src.get("timezone") or cfg.get("timezone") or "UTC"
             start = datetime.combine(day, time(0), ZoneInfo(tz)).astimezone(ZoneInfo("UTC"))
             end = datetime.combine(day + timedelta(days=1), time(0), ZoneInfo(tz)).astimezone(ZoneInfo("UTC"))
+            if src.get("kind") == ESTIMATED:
+                if running is None or not src.get("ratedPowerW"):
+                    continue
+                span = (end - start).total_seconds()
+                kwh = estimated_kwh(float(src["ratedPowerW"]), src.get("standbyPowerW"), running.get(int(src["deviceId"]), 0), span)
+                a = acc.setdefault((int(src["spaceId"]), ESTIMATED), _Acc(site, tz))
+                a.kwh += kwh
+                a.estimated = True
+                hours = max(1, round(span / 3600))
+                a.hourly.extend((start + timedelta(hours=h), kwh / hours) for h in range(hours))
+                continue
+            if src.get("kind") != METERED:
+                continue
             samples = self._samples(int(src["deviceId"]), src["metricKey"], start, end)
             cumulative = src.get("cumulative")
             if cumulative is None:
@@ -156,6 +185,16 @@ class EnergyDaily:
             krw = None if priced.krw is None else round(priced.krw, 2)
             out.append((space_id, kind, a.kwh, krw, carbon([(day, a.kwh)], factors), a.estimated))
         return out
+
+    def _running(self, org: int, day: date, device_ids: list[int]) -> dict[int, int] | None:
+        """추정 원천 기기의 그날 가동 초. 기기가 없으면 빈 값, action에 닿지 않으면 None"""
+        if not device_ids:
+            return {}
+        try:
+            return self.action.on_seconds(org, day, sorted(set(device_ids)))
+        except Exception:  # noqa: BLE001 — 가동 시간을 모르면 추정 행을 쓰지 않는다(측정 행은 쓴다)
+            log.warning("runtime unavailable org=%s day=%s", org, day, exc_info=True)
+            return None
 
     def _samples(self, device_id: int, metric: str, start: datetime, end: datetime) -> list[tuple[datetime, float]]:
         """[start, end) 안의 품질 정상 원본과 경계 앞뒤 한 점(하루 안)"""

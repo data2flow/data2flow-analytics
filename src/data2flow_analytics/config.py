@@ -35,6 +35,7 @@ class Settings:
     realtime_enabled: bool = True
     developer: str = ""
     core_uri: str = "http://data2flow-core-api"
+    action_uri: str = "http://data2flow-action"
     instance_id: str = field(default_factory=socket.gethostname)
     worker_threads: int = 2
     org_run_limit: int = 5  # BR-ANA-08
@@ -82,6 +83,7 @@ class Settings:
             realtime_enabled=_env("DATA2FLOW_ANALYTICS_REALTIME_ENABLED", "false" if profile == "local" else "true") == "true",
             developer=_env("DATA2FLOW_DEV_NAME", ""),
             core_uri=_env("DATA2FLOW_CORE_URI", "http://data2flow-core-api"),
+            action_uri=_env("DATA2FLOW_ACTION_BASE_URL", "http://data2flow-action"),
             instance_id=_env("HOSTNAME", socket.gethostname()),
             worker_threads=int(_env("DATA2FLOW_ANALYTICS_WORKER_THREADS", "2")),
             store_endpoint=_env("DATA2FLOW_ARCHIVE_ENDPOINT"),
