@@ -1,7 +1,7 @@
 """골든 결과 회귀(TC-ANA-182): 템플릿별 고정 입력 결과를 golden/*.json과 비교한다.
 
 의존성(numpy·scikit-learn·statsmodels) 업그레이드 PR에서 상대 오차 1e-6을 넘으면 실패한다. 최적화기를 쓰는 예측(forecast)은
-플랫폼 간 부동소수 차이를 허용해 1e-3으로 보고, 요약 문장 속 숫자(예: "평균 691.6ppm")도 같은 오차로 본다. 골든을 다시 만들 때는 `UPDATE_GOLDEN=1 pytest tests/regression`.
+플랫폼 간 부동소수 차이를 허용해 5e-3으로 보고(검증 구간 오차 분위수로 만드는 95% 구간이 CI 러너 CPU에 따라 0.2%까지 달라진다), 요약 문장 속 숫자(예: "평균 691.6ppm")도 같은 오차로 본다. 골든을 다시 만들 때는 `UPDATE_GOLDEN=1 pytest tests/regression`.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from tests.fixtures.samples import sample
 
 GOLDEN = Path(__file__).parent / "golden"
 REG = build_registry()
-LOOSE = {"forecast": 1e-3}
+LOOSE = {"forecast": 5e-3}
 NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
 
 
