@@ -32,6 +32,7 @@ dev = [
     "testcontainers[postgres,rabbitmq]>=4.8",  # Apache-2.0 (테스트 전용: PostgreSQL 18, RabbitMQ stream)
     "moto[s3]>=5.0",                  # Apache-2.0 (테스트 전용 가짜 S3)
     "pypdf>=5.0",                     # BSD-3 (테스트 전용 PDF 글자 추출)
+    "hypothesis>=6.100",              # MPL-2.0 (테스트 전용 속성 기반 테스트, TC-ENE-018)
     "ruff>=0.6",                      # MIT
 ]
 
