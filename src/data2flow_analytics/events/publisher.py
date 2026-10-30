@@ -30,6 +30,7 @@ SCHEDULE_STOPPED = "analytics.schedule.stopped"  # EVT-ANA-05
 EXPORT_COMPLETED = "analytics.export.completed"  # EVT-ANA-06
 ENERGY_DAILY = "energy.daily.updated"  # EVT-ENE-01
 ENERGY_BASELINE_TRAINED = "energy.baseline.trained"  # EVT-ENE-02
+ENERGY_VIRTUAL_SENSOR = "energy.virtual-sensor.updated"  # EVT-ENE-03
 
 
 def own_event(event_type: str) -> bool:

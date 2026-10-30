@@ -20,6 +20,7 @@ from ..deps import Deps
 from ..energy.baselines import JOB as BASELINE
 from ..energy.baselines import EnergyBaselines
 from ..energy.daily import EnergyDaily
+from ..energy.virtual import VirtualSensors
 from ..export.service import ExportService
 from ..models.lifecycle import ModelService
 from .runner import RunRunner
@@ -39,6 +40,7 @@ class Worker:
         self.exports = ExportService(deps, analytics_service)
         self.energy = EnergyDaily(deps)
         self.baselines = EnergyBaselines(deps)
+        self.virtual = VirtualSensors(deps, self.energy)
         self.stop = threading.Event()
         self.name = f"{deps.settings.instance_id}"
         self._last_daily: str | None = None
@@ -123,6 +125,10 @@ class Worker:
             out["energy"] = self.energy.tick()
         except Exception:  # noqa: BLE001 — 설정 API에 닿지 않아도 다른 정리는 계속
             log.exception("energy daily tick failed")
+        try:
+            out["virtualSensors"] = self.virtual.tick()
+        except Exception:  # noqa: BLE001
+            log.exception("virtual sensor tick failed")
         return out
 
     # ---- 실행 루프 ----

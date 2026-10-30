@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from datetime import date
 from typing import Any
 
 from fastapi import Body, FastAPI, Query, Request
@@ -16,7 +17,7 @@ from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import __version__
-from .common.errors import BusinessError, ErrorCode, pick_language
+from .common.errors import BusinessError, ErrorCode, FieldError, pick_language
 from .common.jsonutil import to_jsonable
 
 log = logging.getLogger("data2flow_analytics.api")
@@ -313,6 +314,21 @@ def create_app(services: Any = None) -> FastAPI:
     @app.post(f"{P}/energy/baselines/train")
     def energy_baseline_train(request: Request, body: dict = Body(default_factory=dict)):
         return ok(svc(request).baselines.request(Identity(request).org, body), 202)
+
+    # ------------------------------------------------------------ 가상 센서(API-ENE-82 reload, core API-ENE-21의 ACH 조회)
+    @app.post(f"{P}/energy/virtual-sensors/reload")
+    def energy_virtual_reload(request: Request, body: dict = Body(default_factory=dict)):
+        org = body.get("orgId") or Identity(request).org
+        svc(request).virtual.reload(int(org), int(body["spaceId"]) if body.get("spaceId") else None)
+        return Response(status_code=204)
+
+    @app.get(P + "/energy/spaces/{space_id}/ach")
+    def energy_space_ach(request: Request, space_id: int, from_: str = Query(alias="from"), to: str = Query()):
+        try:
+            start, end = date.fromisoformat(from_), date.fromisoformat(to)
+        except ValueError as exc:
+            raise BusinessError(ErrorCode.INVALID_REQUEST, errors=[FieldError("from", "Date", "YYYY-MM-DD")]) from exc
+        return ok({"items": svc(request).virtual.ach_series(Identity(request).org, space_id, start, end)})
 
     @app.get(P + "/energy/baselines/{key}")
     def energy_baseline(request: Request, key: str):
