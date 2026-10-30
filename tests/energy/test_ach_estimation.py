@@ -78,3 +78,11 @@ def test_segments_split_on_sustained_rise_and_stop_at_floor():
     clean_t, clean_v = curve(minutes=120)
     (a, b), = ach.segments(clean_t, clean_v)
     assert clean_v[b] - 420 >= 50 - 5
+
+
+def test_tc_ene_034_min_decay_minutes_setting():
+    """설정의 최소 감쇠 구간(minDecayMinutes)이 기본 30분을 대신한다"""
+    times, values = curve(minutes=45)
+    assert ach.estimate(times, values).estimate is not None
+    r = ach.estimate(times, values, min_minutes=60)
+    assert r.estimate is None and r.reason == ach.TOO_SHORT

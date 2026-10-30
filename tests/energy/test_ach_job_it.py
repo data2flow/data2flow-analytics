@@ -94,10 +94,10 @@ def test_ENE_02_01_ach_tick_writes_estimate_event_once(virtual, clock):
 
     events = virtual.publisher.of_type("energy.virtual-sensor.updated")
     assert [e.payload for e in events] == [
-        {"spaceId": 31, "kind": "ACH", "metricKeys": ["ach", "ventilation_m3h"], "computedFrom": "2026-10-04T00:00:00+09:00",
-         "computedTo": "2026-10-05T00:00:00+09:00", "status": "OK", "missing": None},
-        {"spaceId": 32, "kind": "ACH", "metricKeys": ["ach", "ventilation_m3h"], "computedFrom": "2026-10-04T00:00:00+09:00",
-         "computedTo": "2026-10-05T00:00:00+09:00", "status": "INPUT_MISSING", "missing": ["co2"]}]
+        {"spaceId": 31, "kind": "ACH", "metricKeys": ["ach", "ventilation_m3h"], "computedFrom": "2026-10-03T15:00:00Z",
+         "computedTo": "2026-10-04T15:00:00Z", "status": "OK", "missing": None},
+        {"spaceId": 32, "kind": "ACH", "metricKeys": ["ach", "ventilation_m3h"], "computedFrom": "2026-10-03T15:00:00Z",
+         "computedTo": "2026-10-04T15:00:00Z", "status": "INPUT_MISSING", "missing": ["co2"]}]
 
     # 다른 인스턴스가 다시 돌아도 한 번만
     assert VirtualSensors(virtual, EnergyDaily(virtual)).tick() == []

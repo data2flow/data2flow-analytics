@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from ..deps import Deps
@@ -30,6 +30,10 @@ ACH_METRICS = ["ach", "ventilation_m3h"]
 
 def ach_sensors(cfg: dict) -> list[dict]:
     return [v for v in cfg.get("virtualSensors") or [] if v.get("kind") == ACH and v.get("enabled", True)]
+
+
+def _utc(t: datetime) -> str:
+    return t.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _inputs(sensor: dict, metric: str) -> list[int]:
@@ -75,7 +79,9 @@ class VirtualSensors:
         zone = ZoneInfo(tz)
         start, end = datetime.combine(day, time(0), zone), datetime.combine(day + timedelta(days=1), time(0), zone)
         devices = _inputs(sensor, CO2)
-        outdoor = float((sensor.get("params") or {}).get("outdoorCo2Ppm") or ach.OUTDOOR_PPM)
+        params = sensor.get("params") or {}
+        outdoor = float(params.get("outdoorCo2Ppm") or ach.OUTDOOR_PPM)
+        min_minutes = float(params.get("minDecayMinutes") or ach.MIN_MINUTES)
         result, status, missing = None, "OK", None
         if not devices:
             status, missing = "INPUT_MISSING", [CO2]
@@ -83,7 +89,7 @@ class VirtualSensors:
             best: ach.Result | None = None
             for device in devices:
                 samples = self.samples(device, CO2, start, end)
-                r = ach.estimate([t for t, _ in samples], [v for _, v in samples], outdoor)
+                r = ach.estimate([t for t, _ in samples], [v for _, v in samples], outdoor, min_minutes)
                 if r.estimate is not None and (best is None or best.estimate is None or r.estimate.r2 > best.estimate.r2):
                     best = r
                 elif best is None:
@@ -104,7 +110,7 @@ class VirtualSensors:
                                  ci_high = EXCLUDED.ci_high, decay_from = EXCLUDED.decay_from, decay_to = EXCLUDED.decay_to,
                                  r2_fit = EXCLUDED.r2_fit""",
                              (org, space, day, est.ach, est.ci_low, est.ci_high, est.decay_from, est.decay_to, est.r2, now))
-        payload = {"spaceId": space, "kind": ACH, "metricKeys": ACH_METRICS, "computedFrom": start.isoformat(), "computedTo": end.isoformat(),
+        payload = {"spaceId": space, "kind": ACH, "metricKeys": ACH_METRICS, "computedFrom": _utc(start), "computedTo": _utc(end),
                    "status": status, "missing": missing}
         ev.safe_publish(self.deps.publisher, ev.make_event(self.deps.clock, ev.ENERGY_VIRTUAL_SENSOR, org, payload))
         return {"organizationId": org, "spaceId": space, "day": day.isoformat(), "status": status, "ach": est.ach if est else None, "reason": reason}

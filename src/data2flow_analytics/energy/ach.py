@@ -93,13 +93,13 @@ def segments(times: Sequence[datetime], values: Sequence[float], outdoor: float 
     return out
 
 
-def fit(times: Sequence[datetime], values: Sequence[float], outdoor: float = OUTDOOR_PPM) -> Result:
+def fit(times: Sequence[datetime], values: Sequence[float], outdoor: float = OUTDOOR_PPM, min_minutes: float = MIN_MINUTES) -> Result:
     """한 감쇠 구간의 ACH. 조건에 맞지 않으면 사유"""
     v = np.asarray(values, dtype=float)
     if len(v) < 3:
         return Result(None, TOO_SHORT)
     minutes = (times[-1] - times[0]).total_seconds() / 60
-    if minutes < MIN_MINUTES:
+    if minutes < min_minutes:
         return Result(None, TOO_SHORT)
     if float(np.median(v[:SMOOTH])) - outdoor < MIN_AMPLITUDE:
         return Result(None, LOW_AMPLITUDE)
@@ -118,14 +118,15 @@ def fit(times: Sequence[datetime], values: Sequence[float], outdoor: float = OUT
     return Result(Estimate(round(ach, 4), round(ach - half, 4), round(ach + half, 4), round(r2, 4), times[0], times[-1], int(len(t))))
 
 
-def estimate(times: Sequence[datetime], values: Sequence[float], outdoor: float = OUTDOOR_PPM) -> Result:
+def estimate(times: Sequence[datetime], values: Sequence[float], outdoor: float = OUTDOOR_PPM,
+             min_minutes: float = MIN_MINUTES) -> Result:
     """시계열에서 가장 잘 맞는 감쇠 구간의 ACH. 없으면 가장 앞선 단계의 사유(진폭 → 길이 → 적합)"""
     if len(values) < 3:
         return Result(None, NO_DATA)
     best: Estimate | None = None
     reasons: list[str] = []
     for a, b in segments(times, values, outdoor) or [(0, len(values) - 1)]:
-        r = fit(times[a:b + 1], values[a:b + 1], outdoor)
+        r = fit(times[a:b + 1], values[a:b + 1], outdoor, min_minutes)
         if r.estimate is None:
             reasons.append(r.reason or LOW_FIT)
         elif best is None or r.estimate.r2 > best.r2:
