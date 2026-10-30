@@ -15,7 +15,9 @@ from .db import create_pool
 from .db.migrate import run as run_migrations
 from .deps import Deps
 from .energy.baselines import EnergyBaselines
+from .energy.daily import EnergyDaily
 from .energy.metrics import EnergyMetrics
+from .energy.virtual import VirtualSensors
 from .events.publisher import EventPublisher, RabbitPublisher, RecordingPublisher
 from .export.service import ExportService
 from .kpi import KpiService
@@ -39,6 +41,7 @@ class Services:
     kpis: KpiService
     energy: EnergyMetrics
     baselines: EnergyBaselines
+    virtual: VirtualSensors
 
     def close(self) -> None:
         closer = getattr(self.deps.publisher, "close", None)
@@ -63,7 +66,7 @@ def make_services(deps: Deps, subprocess_runs: bool = False) -> Services:
     analytics = AnalyticsService(deps)
     executor = SubprocessExecutor(deps.extra_template_dirs) if subprocess_runs else InlineExecutor(deps.registry)
     return Services(deps, analytics, DatasetService(deps), ModelService(deps, executor), ExportService(deps, analytics), KpiService(deps),
-                    EnergyMetrics(deps), EnergyBaselines(deps))
+                    EnergyMetrics(deps), EnergyBaselines(deps), VirtualSensors(deps, EnergyDaily(deps)))
 
 
 def build_deps(settings: Settings, *, clock: Clock | None = None, publisher: EventPublisher | None = None,

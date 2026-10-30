@@ -18,7 +18,7 @@ def test_migration_applied_and_validates(conninfo):
                                  AND tablename NOT LIKE 'realtime_events_%' AND tablename <> 'flyway_schema_history'""").fetchone()[0]
         history = conn.execute("SELECT version, type, success, checksum FROM data2flow_analytics.flyway_schema_history "
                                "ORDER BY installed_rank").fetchall()
-    assert tables == 18
+    assert tables == 19
     assert history == [(mig.version, "SQL", True, mig.checksum()) for mig in discover()]
     with pytest.raises(MigrationError):
         run(conninfo, "weird")
