@@ -20,6 +20,7 @@ from ..deps import Deps
 from ..energy.baselines import JOB as BASELINE
 from ..energy.baselines import EnergyBaselines
 from ..energy.daily import EnergyDaily
+from ..energy.occupancy import OccupancySensors
 from ..energy.virtual import VirtualSensors
 from ..export.service import ExportService
 from ..models.lifecycle import ModelService
@@ -41,6 +42,7 @@ class Worker:
         self.energy = EnergyDaily(deps)
         self.baselines = EnergyBaselines(deps)
         self.virtual = VirtualSensors(deps, self.energy)
+        self.occupancy = OccupancySensors(deps, self.energy)
         self.stop = threading.Event()
         self.name = f"{deps.settings.instance_id}"
         self._last_daily: str | None = None
@@ -129,6 +131,10 @@ class Worker:
             out["virtualSensors"] = self.virtual.tick()
         except Exception:  # noqa: BLE001
             log.exception("virtual sensor tick failed")
+        try:
+            out["occupancy"] = self.occupancy.tick()
+        except Exception:  # noqa: BLE001
+            log.exception("occupancy tick failed")
         return out
 
     # ---- 실행 루프 ----

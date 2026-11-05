@@ -32,6 +32,44 @@ CAVEAT = "재실 여부와 활용률은 센서로 본 추정치입니다. 예약
 DAYS = ["월", "화", "수", "목", "금", "토", "일"]
 
 
+def estimate_frames(frames: dict[str, pd.Series]) -> tuple[pd.Series, dict[str, pd.Series]]:
+    """신호별 시계열(activity·co2·noise·illuminance 중 2개 이상, 시각 순)로 재실 0/1을 판정한다. 가상 센서(ENE-02.02)도 이 규칙을 쓴다"""
+    base = frames.get("activity", next(iter(frames.values())))
+    index = base.index
+    step = median_step(index)
+    win = steps_for(pd.Timedelta(minutes=10), step, minimum=1)
+    evidence: dict[str, pd.Series] = {}
+    weights: dict[str, float] = {}
+    if "activity" in frames:
+        act = frames["activity"].reindex(index).fillna(0)
+        win_act = steps_for(pd.Timedelta(minutes=5), step, minimum=1)
+        evidence["activity"] = ((act > 0).astype(float).rolling(win_act, center=True, min_periods=1).sum() >= 2).astype(float)
+        weights["activity"] = 2.0
+    if "co2" in frames:
+        co2 = frames["co2"].reindex(index, method="nearest", tolerance=pd.Timedelta(minutes=15)).interpolate(limit_direction="both")
+        slope = (co2 - co2.shift(win)) / (win * step / pd.Timedelta(minutes=1))
+        level = co2 > float(np.nanpercentile(co2, 5)) + 250
+        evidence["co2"] = ((slope.fillna(0) > 3.0) | level).astype(float)
+        weights["co2"] = 1.0 if "activity" in frames else 2.0
+    if "noise" in frames:
+        noise = frames["noise"].reindex(index, method="nearest", tolerance=pd.Timedelta(minutes=15))
+        evidence["noise"] = (noise > float(np.nanpercentile(noise, 10)) + 8).astype(float)
+        weights["noise"] = 1.0
+    if "illuminance" in frames:
+        lux = frames["illuminance"].reindex(index, method="nearest", tolerance=pd.Timedelta(minutes=15))
+        evidence["illuminance"] = (lux > float(np.nanpercentile(lux, 10)) + 100).astype(float)
+        weights["illuminance"] = 1.0
+    total = sum(weights.values())
+    score = sum(evidence[k] * w for k, w in weights.items()) / total
+    occ = (score >= 0.5).to_numpy()
+    # 짧은 끊김은 메우고 짧은 재실은 버린다
+    gap = steps_for(pd.Timedelta(minutes=5), step, minimum=1)
+    filled = np.zeros_like(occ)
+    for a, b in group_runs(occ, max_gap=gap):
+        filled[a:b + 1] = True
+    return pd.Series(filled.astype(int), index=index), evidence
+
+
 class Params(TemplateParams):
     operatingStart: str = Field("09:00", pattern=r"^\d{2}:\d{2}$", description="운영 시작 시각(조직 시간대). 활용률의 분모가 되는 운영 시간의 시작")
     operatingEnd: str = Field("18:00", pattern=r"^\d{2}:\d{2}$", description="운영 끝 시각(조직 시간대)")
@@ -70,40 +108,7 @@ class OccupancyEstimate(Template):
 
     def estimate(self, data: InputData) -> tuple[pd.Series, dict[str, pd.Series]]:
         frames = {r: data.role(r).iloc[:, 0].dropna().sort_index() for r in SIGNALS if data.has_role(r)}
-        base = frames.get("activity", next(iter(frames.values())))
-        index = base.index
-        step = median_step(index)
-        win = steps_for(pd.Timedelta(minutes=10), step, minimum=1)
-        evidence: dict[str, pd.Series] = {}
-        weights: dict[str, float] = {}
-        if "activity" in frames:
-            act = frames["activity"].reindex(index).fillna(0)
-            win_act = steps_for(pd.Timedelta(minutes=5), step, minimum=1)
-            evidence["activity"] = ((act > 0).astype(float).rolling(win_act, center=True, min_periods=1).sum() >= 2).astype(float)
-            weights["activity"] = 2.0
-        if "co2" in frames:
-            co2 = frames["co2"].reindex(index, method="nearest", tolerance=pd.Timedelta(minutes=15)).interpolate(limit_direction="both")
-            slope = (co2 - co2.shift(win)) / (win * step / pd.Timedelta(minutes=1))
-            level = co2 > float(np.nanpercentile(co2, 5)) + 250
-            evidence["co2"] = ((slope.fillna(0) > 3.0) | level).astype(float)
-            weights["co2"] = 1.0 if "activity" in frames else 2.0
-        if "noise" in frames:
-            noise = frames["noise"].reindex(index, method="nearest", tolerance=pd.Timedelta(minutes=15))
-            evidence["noise"] = (noise > float(np.nanpercentile(noise, 10)) + 8).astype(float)
-            weights["noise"] = 1.0
-        if "illuminance" in frames:
-            lux = frames["illuminance"].reindex(index, method="nearest", tolerance=pd.Timedelta(minutes=15))
-            evidence["illuminance"] = (lux > float(np.nanpercentile(lux, 10)) + 100).astype(float)
-            weights["illuminance"] = 1.0
-        total = sum(weights.values())
-        score = sum(evidence[k] * w for k, w in weights.items()) / total
-        occ = (score >= 0.5).to_numpy()
-        # 짧은 끊김은 메우고 짧은 재실은 버린다
-        gap = steps_for(pd.Timedelta(minutes=5), step, minimum=1)
-        filled = np.zeros_like(occ)
-        for a, b in group_runs(occ, max_gap=gap):
-            filled[a:b + 1] = True
-        return pd.Series(filled.astype(int), index=index), evidence
+        return estimate_frames(frames)
 
     def run(self, data: InputData, params: Params, ctx: RunContext) -> Result:
         occ, _ = self.estimate(data)

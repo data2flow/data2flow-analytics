@@ -97,7 +97,8 @@ def deps(conninfo, clock, tmp_path):
                         data2flow_analytics.results, data2flow_analytics.jobs, data2flow_analytics.runs, data2flow_analytics.analyses,
                         data2flow_analytics.dataset_versions, data2flow_analytics.datasets, data2flow_analytics.template_settings,
                         data2flow_analytics.energy_daily, data2flow_analytics.energy_daily_runs, data2flow_analytics.baseline_models,
-                        data2flow_analytics.ach_estimates, data2flow_analytics.virtual_sensor_runs CASCADE""")
+                        data2flow_analytics.ach_estimates, data2flow_analytics.virtual_sensor_runs,
+                        data2flow_analytics.virtual_sensor_ticks CASCADE""")
         conn.execute("""TRUNCATE data2flow_pipeline.telemetry, data2flow_pipeline.telemetry_long, data2flow_pipeline.telemetry_1m,
                         data2flow_pipeline.telemetry_1h, data2flow_pipeline.telemetry_1d, data2flow_pipeline.device_state,
                         data2flow_pipeline.data_quality_daily, data2flow_pipeline.agg_watermarks,
