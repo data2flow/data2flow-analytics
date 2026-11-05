@@ -36,6 +36,7 @@ class Settings:
     developer: str = ""
     core_uri: str = "http://data2flow-core-api"
     action_uri: str = "http://data2flow-action"
+    pipeline_uri: str = "http://data2flow-pipeline"
     instance_id: str = field(default_factory=socket.gethostname)
     worker_threads: int = 2
     org_run_limit: int = 5  # BR-ANA-08
@@ -84,6 +85,7 @@ class Settings:
             developer=_env("DATA2FLOW_DEV_NAME", ""),
             core_uri=_env("DATA2FLOW_CORE_URI", "http://data2flow-core-api"),
             action_uri=_env("DATA2FLOW_ACTION_BASE_URL", "http://data2flow-action"),
+            pipeline_uri=_env("DATA2FLOW_PIPELINE_URI", "http://data2flow-pipeline"),
             instance_id=_env("HOSTNAME", socket.gethostname()),
             worker_threads=int(_env("DATA2FLOW_ANALYTICS_WORKER_THREADS", "2")),
             store_endpoint=_env("DATA2FLOW_ARCHIVE_ENDPOINT"),
